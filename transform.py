@@ -1,85 +1,21 @@
 import pandas as pd
-import requests
-from dotenv import load_dotenv
 import os
-from bs4 import BeautifulSoup
-import re
-from openai import OpenAI
 import json
 import time
 import threading
-import chardet
-
-
-def categorize_text(text, function_context):
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system",
-             "content": "You are a helpful assistant designed to output JSON."},
-            {"role": "user", "content": text},
-        ],
-        functions=function_context,
-        function_call={"name": "choose_from_options"}
-    )
-
-    # # Assuming response object has a 'status_code' attribute
-    # status_code = response.status_code
-    # print(f"Status Code: {status_code}")
-
-    response = response.choices[0].message.function_call.arguments
-
-    return json.loads(response)
-
-
-def process_row(index, row, df):
-    """
-    Handler function to process the rows and updates the values in the dataframe.
-    """
-    text = row['Description']
-    res = categorize_text(text=text, function_context=FUNCTION_CONTEXT)
-    # if res.get('error', None):
-    #     repeat = True
-    #     while repeat:
-    #         time.sleep(1)
-    #         res = categorize_text(cleaned_text)
-    #         print(f"Res: {res}, sleeping for 1 second.")
-    #         if not res.get('error', None):
-    #             print("Res is now true for {url}. Continuiing!")
-    #             repeat = False
-
-    if res.get('has_python', None) is None:
-        df.at[index, 'enriched_with_chatgpt'] = "empty_response_from_openai_api"
-        return
-
-    print(f"ChatGPT categorisation for the index {index}:\n{res}")
-    # if pd.isna(row['has_python']):
-    df.at[index, 'company_industry'] = res['company_industry']
-    df.at[index, 'company_type'] = res['company_type']
-    df.at[index, 'enriched_with_chatgpt'] = True
-    df.at[index, 'has_django'] = res['has_django']
-    df.at[index, 'has_python'] = res['has_python']
-    df.at[index, 'is_data_engineer'] = res['is_data_engineer']
-    df.at[index, 'is_fullstack'] = res['is_fullstack']
-    df.at[index, 'is_sustainability_focused'] = res['is_sustainability_focused']
-    df.at[index, 'seniority_level'] = res['seniority_level']
-    df.at[index, 'years_of_experience'] = res['years_of_experience']
-    df.at[index, 'location'] = res['location']
-    df.at[index, 'has_frontent_mentioned'] = res['has_frontent_mentioned']
-    return
-
+from dotenv import load_dotenv
+from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
 
-filename = 'df_with_description'
-
-# Initialize API keys and client
+# Constants
+FILENAME = 'df_with_description'
+OUTPUT_FILENAME = f"{FILENAME}_result.csv"
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
+# Initialize API client
 client = OpenAI(api_key=OPENAI_API_KEY)
-
 
 FUNCTION_CONTEXT = [{
     "name": "choose_from_options",
@@ -141,50 +77,126 @@ FUNCTION_CONTEXT = [{
             },
         },
     },
-    "required": ["has_python", "has_django", "is_fullstack" "company_type", "seniority_level", "years_of_experience", "is_data_engineer", "is_sustainability_focused", "company_industry", "location"]
-}
-]
+    "required": ["has_python", "has_django", "is_fullstack", "company_type", "seniority_level", "years_of_experience", "is_data_engineer", "is_sustainability_focused", "company_industry", "location"]
+}]
 
-df = pd.read_csv(f"{filename}.csv", on_bad_lines='skip')
-df['company_industry'] = None
-df['company_type'] = None
-df['enriched_with_chatgpt'] = False
-df['has_django'] = None
-df['has_python'] = None
-df['is_data_engineer'] = None
-df['is_fullstack'] = None
-df['is_sustainability_focused'] = None
-df['seniority_level'] = None
-df['years_of_experience'] = None
-df['location'] = None
-df['has_frontent_mentioned'] = None
 
-# session = requests.Session()
-threads = []
+def categorize_text(text: str, function_context: list) -> dict:
+    """
+    Categorizes the text using OpenAI's chat completion API.
 
-for index, row in df.iterrows():
-    print(f"Processing row {index}")
-    thread = threading.Thread(
-        target=process_row, args=(index, row, df))
-    threads.append(thread)
-    thread.start()
+    Args:
+        text (str): The text to categorize.
+        function_context (list): The function context for the API call.
 
-    time.sleep(0.3)  # Adding a delay between starting each thread
+    Returns:
+        dict: A dictionary containing the categorized information.
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system",
+                    "content": "You are a helpful assistant designed to output JSON."},
+                {"role": "user", "content": text},
+            ],
+            functions=function_context,
+            function_call={"name": "choose_from_options"}
+        )
+        # Extracting and parsing the response
+        response_content = response.choices[0].message.function_call.arguments
+        return json.loads(response_content)
+    except Exception as e:
+        print(f"Error categorizing text: {e}")
+        return {}
 
-    if index % 10 == 0 and index != 0:
-        for thread in threads:
-            thread.join()
-        threads = []
-        df.fillna('unknown', inplace=True)
-        df.to_csv(f"{filename}_result.csv", index=False)
 
-        # if index == 20:
-        #     raise
+def process_row(index: int, row: pd.Series, df: pd.DataFrame) -> None:
+    """
+    Processes a single row in the DataFrame and updates it with categorized information.
 
-for thread in threads:
-    thread.join()
+    Args:
+        index (int): The index of the row being processed.
+        row (pd.Series): The row data to process.
+        df (pd.DataFrame): The DataFrame being updated with categorized information.
 
-df.to_csv(f"{filename}_result.csv", index=False)
+    Returns:
+        None
+    """
+    text = row['Description']
+    res = categorize_text(text=text, function_context=FUNCTION_CONTEXT)
 
-print()
-print(df)
+    if res.get('has_python') is None:
+        df.at[index, 'enriched_with_chatgpt'] = "empty_response_from_openai_api"
+        return
+
+    print(f"ChatGPT categorisation for index {index}:\n{res}")
+
+    # Define the columns to update and their corresponding keys in the response
+    columns_to_update = {
+        'company_industry': 'company_industry',
+        'company_type': 'company_type',
+        'enriched_with_chatgpt': True,
+        'has_django': 'has_django',
+        'has_python': 'has_python',
+        'is_data_engineer': 'is_data_engineer',
+        'is_fullstack': 'is_fullstack',
+        'is_sustainability_focused': 'is_sustainability_focused',
+        'seniority_level': 'seniority_level',
+        'years_of_experience': 'years_of_experience',
+        'location': 'location',
+        'has_frontent_mentioned': 'has_frontent_mentioned'
+    }
+
+    # Update the DataFrame using a loop
+    for col, key in columns_to_update.items():
+        df.at[index, col] = res.get(key, None) if isinstance(key, str) else key
+
+
+def transform() -> None:
+    """
+    Main function to load data, process it, and output results.
+
+    Returns:
+        None
+    """
+    df = pd.read_csv(f"{FILENAME}.csv", on_bad_lines='skip')
+    # Initialize columns in DataFrame
+    for col in ['company_industry', 'company_type', 'enriched_with_chatgpt',
+                'has_django', 'has_python', 'is_data_engineer',
+                'is_fullstack', 'is_sustainability_focused',
+                'seniority_level', 'years_of_experience',
+                'location', 'has_frontent_mentioned']:
+        df[col] = None
+
+    threads = []
+
+    for index, row in df.iterrows():
+        print(f"Processing row {index}")
+        thread = threading.Thread(target=process_row, args=(index, row, df))
+        threads.append(thread)
+        thread.start()
+
+        time.sleep(0.3)  # Adding a delay between starting each thread
+
+        # Join threads in batches of 10
+        if index % 10 == 0 and index != 0:
+            for thread in threads:
+                thread.join()
+            threads = []
+            df.fillna('unknown', inplace=True)
+            df.to_csv(OUTPUT_FILENAME, index=False)
+
+    # Join any remaining threads
+    for thread in threads:
+        thread.join()
+
+    # Final output
+    df.fillna('unknown', inplace=True)
+    df.to_csv(OUTPUT_FILENAME, index=False)
+    print(df)
+
+
+if __name__ == "__main__":
+    transform()
