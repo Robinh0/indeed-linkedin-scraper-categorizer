@@ -15,7 +15,7 @@ nltk.download('punkt')
 nltk.download('stopwords')
 
 # Constants
-SEARCH_TERM = '"python" -senior -lead -manager'.replace(
+SEARCH_TERM = 'full stack -senior -lead -manager'.replace(
     '-', 'N').replace(" ", "").replace('"', '')
 STARTING_URL = "https://nl.indeed.com/jobs?q=full+stack+-senior+-lead+-manager&l=Randstad"
 AMOUNT_OF_LINKS = 10

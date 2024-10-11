@@ -13,6 +13,9 @@ nltk = "*"
 langdetect = "*"
 seleniumbase = "*"
 undetected-chromedriver = "*"
+pyvirtualdisplay = "*"
+pillow = "*"
+easyprocess = "*"
 
 [dev-packages]
 
