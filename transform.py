@@ -5,17 +5,35 @@ import time
 import threading
 from dotenv import load_dotenv
 from openai import OpenAI
+from extract import SEARCH_TERM
 
 # Load environment variables
 load_dotenv()
 
 # Constants
-FILENAME = 'df_with_description'
-OUTPUT_FILENAME = f"{FILENAME}_result.csv"
+FILENAME = f'results/{SEARCH_TERM}_extraction'
+OUTPUT_FILENAME = f'results/{SEARCH_TERM}_result.csv'
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # Initialize API client
 client = OpenAI(api_key=OPENAI_API_KEY)
+
+COLUMNS = [
+    "backend_frameworks",
+    "company_industry",
+    "company_name",
+    "company_size",
+    "company_type",
+    "frontend_frameworks",
+    "has_django",
+    "has_python",
+    "is_data_engineer",
+    "is_fullstack",
+    "is_sustainability_focused",
+    "location",
+    "seniority_level",
+    "years_of_experience",
+]
 
 FUNCTION_CONTEXT = [{
     "name": "choose_from_options",
@@ -38,10 +56,13 @@ FUNCTION_CONTEXT = [{
                 "description": "Is this a fullstack role with React, Angular or Vue? Return exactly the is_fullstack json key",
                 "enum": ['True', 'False']
             },
-            "has_frontent_mentioned": {
+            "frontend_frameworks": {
                 "type": "string",
-                "description": "Is frontend mentioned in this job role? For example with javascript, typescript, react, angular or vue? Return exactly the has_frontent_mentioned json key",
-                "enum": ['True', 'False']
+                "description": "What frontend frameworks are mentioned, if any? Return exactly the frontend_frameworks json key",
+            },
+            "backend_frameworks": {
+                "type": "string",
+                "description": "What backend frameworks are mentioned, if any? Return exactly the backend_frameworks json key",
             },
             "company_type": {
                 "type": "string",
@@ -58,7 +79,7 @@ FUNCTION_CONTEXT = [{
                 "description": "How many years of experience is required for this job role as a number? Return exactly the years_of_experience json key",
             },
             "is_data_engineer": {
-                "type": "string",
+                "type": "integer",
                 "description": "Is this role a data engineering role? Return exactly the is_data_engineer json key",
                 "enum": ['True', 'False']
             },
@@ -75,9 +96,17 @@ FUNCTION_CONTEXT = [{
                 "type": "string",
                 "description": "What is the location of the company in the job post? Return exactly the location json key",
             },
+            "company_name": {
+                "type": "string",
+                "description": "What is the name of the company, if mentioned in the job post? Return exactly the company_name json key",
+            },
+            "company_size": {
+                "type": "integer",
+                "description": "If the company name is mentioned, what is the estimated company size in FTE? Return exactly the company_size json key",
+            },
         },
     },
-    "required": ["has_python", "has_django", "is_fullstack", "company_type", "seniority_level", "years_of_experience", "is_data_engineer", "is_sustainability_focused", "company_industry", "location"]
+    "required": COLUMNS
 }]
 
 
@@ -133,25 +162,8 @@ def process_row(index: int, row: pd.Series, df: pd.DataFrame) -> None:
 
     print(f"ChatGPT categorisation for index {index}:\n{res}")
 
-    # Define the columns to update and their corresponding keys in the response
-    columns_to_update = {
-        'company_industry': 'company_industry',
-        'company_type': 'company_type',
-        'enriched_with_chatgpt': True,
-        'has_django': 'has_django',
-        'has_python': 'has_python',
-        'is_data_engineer': 'is_data_engineer',
-        'is_fullstack': 'is_fullstack',
-        'is_sustainability_focused': 'is_sustainability_focused',
-        'seniority_level': 'seniority_level',
-        'years_of_experience': 'years_of_experience',
-        'location': 'location',
-        'has_frontent_mentioned': 'has_frontent_mentioned'
-    }
-
-    # Update the DataFrame using a loop
-    for col, key in columns_to_update.items():
-        df.at[index, col] = res.get(key, None) if isinstance(key, str) else key
+    for column in COLUMNS:
+        df.at[index, column] = res.get(column, None)
 
 
 def transform() -> None:
@@ -163,11 +175,7 @@ def transform() -> None:
     """
     df = pd.read_csv(f"{FILENAME}.csv", on_bad_lines='skip')
     # Initialize columns in DataFrame
-    for col in ['company_industry', 'company_type', 'enriched_with_chatgpt',
-                'has_django', 'has_python', 'is_data_engineer',
-                'is_fullstack', 'is_sustainability_focused',
-                'seniority_level', 'years_of_experience',
-                'location', 'has_frontent_mentioned']:
+    for col in COLUMNS:
         df[col] = None
 
     threads = []
@@ -191,6 +199,14 @@ def transform() -> None:
     # Join any remaining threads
     for thread in threads:
         thread.join()
+
+    # Move the 'description' column to the back
+    # Get all columns except 'description'
+    cols = [col for col in df.columns if col not in ['URL', 'Description']]
+    cols.append('URL')
+    cols.append('Description')
+
+    df = df[cols]  # Reorder the DataFrame
 
     # Final output
     df.fillna('unknown', inplace=True)

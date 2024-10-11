@@ -1,35 +1,26 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import pandas as pd
 from bs4 import BeautifulSoup
+from generics import setup_driver
 from langdetect import detect
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-import nltk
 from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+import nltk
+import pandas as pd
 
 # Download NLTK resources
 nltk.download('punkt')
 nltk.download('stopwords')
 
 # Constants
-DRIVER_PATH = "C:/Users/robin/Documents/App files/chromedriver-win64/chromedriver-win64/chromedriver.exe"
-STARTING_URL = "https://nl.indeed.com/jobs?q=full+stack+-senior+-lead+-manager&l=Randstad&vjk=5545059d83bddb71"
+SEARCH_TERM = '"python" -senior -lead -manager'.replace(
+    '-', 'N').replace(" ", "").replace('"', '')
+STARTING_URL = "https://nl.indeed.com/jobs?q=full+stack+-senior+-lead+-manager&l=Randstad"
 AMOUNT_OF_LINKS = 10
-OUTPUT_CSV = "output_combined.csv"
-RESULTS_CSV = "df_with_description.csv"
-
-
-def setup_driver():
-    """Sets up the Chrome WebDriver with specified options."""
-    chrome_options = Options()
-    service = Service(DRIVER_PATH)
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    return driver
+OUTPUT_CSV = "results/output_combined.csv"
+RESULTS_CSV = f"results/{SEARCH_TERM}_extraction.csv"
 
 
 def scrape_search_results(driver, url):
@@ -69,7 +60,7 @@ def scrape_search_results(driver, url):
         df = pd.DataFrame(data)
 
         # Export the DataFrame to a CSV file
-        df.to_csv(OUTPUT_CSV, index=False)
+        # df.to_csv(OUTPUT_CSV, index=False)
 
         # Return the DataFrame and the first link found
         if not df.empty:
@@ -178,7 +169,7 @@ def extract():
             #     break
 
             df_all = pd.concat([df_all, df_selection], ignore_index=True)
-            df_all.to_csv(OUTPUT_CSV, index=False)
+            # df_all.to_csv(OUTPUT_CSV, index=False)
 
             # previous_first_link_on_page = first_link_on_page
             counter += 10

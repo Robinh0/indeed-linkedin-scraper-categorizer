@@ -12,6 +12,7 @@ textcleaner = "*"
 nltk = "*"
 langdetect = "*"
 seleniumbase = "*"
+undetected-chromedriver = "*"
 
 [dev-packages]
 
