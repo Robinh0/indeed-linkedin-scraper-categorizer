@@ -15,9 +15,9 @@ nltk.download('punkt')
 nltk.download('stopwords')
 
 # Constants
-SEARCH_TERM = 'full stack -senior -lead -manager'.replace(
+SEARCH_TERM = 'software developer'.replace(
     '-', 'N').replace(" ", "").replace('"', '')
-STARTING_URL = "https://nl.indeed.com/jobs?q=full+stack+-senior+-lead+-manager&l=Randstad"
+STARTING_URL = "https://nl.indeed.com/vacatures?q=software+developer&l=Randstad&sc=0kf%3Aattr%28X62BT%29%3B&"
 AMOUNT_OF_LINKS = 10
 OUTPUT_CSV = "results/output_combined.csv"
 RESULTS_CSV = f"results/{SEARCH_TERM}_extraction.csv"
@@ -72,6 +72,12 @@ def scrape_search_results(driver, url):
 
     except Exception as e:
         print(f"Error while scraping search results: {e}")
+        # Fetch the page source
+        html_source = driver.page_source
+        print("HTML source at the time of error:")
+        # This will print the complete HTML source of the current page
+        print(html_source)
+        raise
         return pd.DataFrame(), None  # Return empty DataFrame and None
 
 

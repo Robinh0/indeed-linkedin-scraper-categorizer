@@ -21,4 +21,4 @@ RUN apt-get update && apt-get install -y wget unzip xvfb xserver-xephyr tigervnc
 COPY . /app
 
 # Command to run your Python application
-CMD ["python", "run_etl.py"]
+CMD ["python", "test.py"]
