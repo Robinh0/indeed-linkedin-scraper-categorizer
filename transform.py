@@ -5,15 +5,15 @@ import time
 import threading
 from dotenv import load_dotenv
 from openai import OpenAI
-from extract import SEARCH_TERM
+from constants import STARTING_URL
+from generics import create_results_filename
 
 # Load environment variables
 load_dotenv()
 
 # Constants
-FILENAME = f'results/{SEARCH_TERM}_extraction'
-OUTPUT_FILENAME = f'results/{SEARCH_TERM}_result.csv'
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+filename = create_results_filename(STARTING_URL)
 
 # Initialize API client
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -153,7 +153,7 @@ def process_row(index: int, row: pd.Series, df: pd.DataFrame) -> None:
     Returns:
         None
     """
-    text = row['Description']
+    text = row['description']
     res = categorize_text(text=text, function_context=FUNCTION_CONTEXT)
 
     if res.get('has_python') is None:
@@ -173,7 +173,8 @@ def transform() -> None:
     Returns:
         None
     """
-    df = pd.read_csv(f"{FILENAME}.csv", on_bad_lines='skip')
+    df = pd.read_csv(
+        f"results/{filename}_descriptions.csv", on_bad_lines='skip')
     # Initialize columns in DataFrame
     for col in COLUMNS:
         df[col] = None
@@ -194,7 +195,7 @@ def transform() -> None:
                 thread.join()
             threads = []
             df.fillna('unknown', inplace=True)
-            df.to_csv(OUTPUT_FILENAME, index=False)
+            df.to_csv(f'{filename}_results.csv', index=False)
 
     # Join any remaining threads
     for thread in threads:
@@ -202,16 +203,18 @@ def transform() -> None:
 
     # Move the 'description' column to the back
     # Get all columns except 'description'
-    cols = [col for col in df.columns if col not in ['URL', 'Description']]
-    cols.append('URL')
-    cols.append('Description')
+    cols = [col for col in df.columns if col not in ['url', 'description']]
+    cols.append('url')
+    cols.append('description')
 
     df = df[cols]  # Reorder the DataFrame
 
     # Final output
     df.fillna('unknown', inplace=True)
-    df.to_csv(OUTPUT_FILENAME, index=False)
+    df.to_csv(f'results/{filename}_results.csv', index=False)
     print(df)
+
+    os.remove(f"results/{filename}_descriptions.csv")
 
 
 if __name__ == "__main__":

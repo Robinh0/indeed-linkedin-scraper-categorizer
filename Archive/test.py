@@ -1,14 +1,11 @@
 from generics import setup_driver
-from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from extract import STARTING_URL
 from bs4 import BeautifulSoup
-from lxml import etree as et
 import pickle
-
-robinbreed = "https://robinbreed.com"
+import time
+from extract import STARTING_URL
 
 
 def test_robinbreed_com(driver):
@@ -36,6 +33,8 @@ def test_robinbreed_com(driver):
     all_text = soup.get_text(separator='\n')
     print(all_text)
 
+    # time.sleep(120)
+
 
 def test_website_text(driver, url):
     driver.get(url)
@@ -54,6 +53,9 @@ def test_website_text(driver, url):
     # Optionally, you can write the text to a file
     with open('text_content.txt', 'w', encoding='utf-8') as text_file:
         text_file.write(all_text)
+
+    time.sleep(100)
+    return
 
 
 def save_cookies(driver, url):
@@ -78,10 +80,14 @@ def load_cookies(driver, url):
     driver.quit()
 
 
+robinbreed = "https://robinbreed.com"
+pixelscan = "https://pixelscan.net/"
+
+
 driver = setup_driver()
 
 # save_cookies(driver, STARTING_URL)
 # load_cookies(driver, STARTING_URL)
 
-test_robinbreed_com(driver)
-# test_website_text(driver, STARTING_URL)
+# test_robinbreed_com(driver)
+test_website_text(driver, pixelscan)
