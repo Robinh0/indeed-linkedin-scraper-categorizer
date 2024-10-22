@@ -1,28 +1,15 @@
 import os
 from bs4 import BeautifulSoup
 from constants import STARTING_URL
-from generics import setup_driver, setup_scrape_browser, create_results_filename
-from langdetect import detect
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
+from generics import setup_driver, get_filename, setup_scrape_browser
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from undetected_chromedriver import Chrome
-import nltk
 import pandas as pd
 import time
-
-filename = create_results_filename(STARTING_URL)
-
-# Download NLTK resources
-nltk.download('punkt')
-nltk.download('stopwords')
-
-# Constants
-# OUTPUT_CSV = "results/output_combined.csv"
-# RESULTS_CSV = f"results/{SEARCH_TERM}_extraction.csv"
+from random import randint
 
 
 def scrape_search_results(driver: Chrome, url_to_scrape):
@@ -107,12 +94,14 @@ def scrape_search_results(driver: Chrome, url_to_scrape):
                 }
             )
         try:
-            driver.execute_script(
-                "window.scrollTo(0, document.body.scrollHeight)")
-            next_button = wait.until(EC.presence_of_element_located(
-                (By.XPATH, "//nav//li/a[@aria-label='Next Page']")))
-            print("Next page button found! Clicking it.")
-            next_button.click()
+            # Only scraping the first page for this demo.
+            pass
+            # driver.execute_script(
+            #     "window.scrollTo(0, document.body.scrollHeight)")
+            # next_button = wait.until(EC.presence_of_element_located(
+            #     (By.XPATH, "//nav//li/a[@aria-label='Next Page']")))
+            # print("Next page button found! Clicking it.")
+            # next_button.click()
         except:
             print(
                 "Next button not found. Setting continue_loop to False and ending the scrape.")
@@ -121,35 +110,8 @@ def scrape_search_results(driver: Chrome, url_to_scrape):
         continue_loop = False
 
     df = pd.DataFrame(data)
-    df.to_csv(f'results/{filename}_links.csv', index=False)
+    df.to_csv(f"results/{get_filename('links')}", index=False)
     return df
-
-
-def remove_stopwords(text):
-    """
-    Removes stopwords from the given text based on the detected language.
-
-    Args:
-        text (str): The input text to clean.
-
-    Returns:
-        str: The cleaned text without stopwords.
-    """
-    lang = detect(text)
-    stop_words = set()
-
-    if lang == 'en':
-        stop_words = set(stopwords.words('english'))
-    elif lang == 'nl':
-        stop_words = set(stopwords.words('dutch'))
-    else:
-        print(
-            f"Unsupported language detected: {lang}. No stopwords will be removed.")
-        return text
-
-    words = word_tokenize(text)
-    filtered_text = [word for word in words if word.lower() not in stop_words]
-    return ' '.join(filtered_text)
 
 
 def scrape_job_info(driver, url):
@@ -184,17 +146,16 @@ def scrape_job_info(driver, url):
             return None, None  # Return None values if a WebDriver error occurs
 
     # Extract and clean text
-    cleaned_descriptions = []
+    text_list = []
     for element in text_elements:
         html_content = element.get_attribute('innerHTML')
         soup = BeautifulSoup(html_content, "html.parser")
         cleaned_text = soup.get_text(separator=' ', strip=True)
-        cleaned_descriptions.append(cleaned_text)
+        text_list.append(cleaned_text)
 
-    combined_text = ' '.join(cleaned_descriptions)
-    cleaned_text = remove_stopwords(combined_text)
+    description = ' '.join(text_list)
 
-    return cleaned_text
+    return html_content, description
 
 
 def extract():
@@ -208,33 +169,31 @@ def extract():
         df['description'] = None
 
         for index, row in df.iterrows():
+            sleeping_time = (randint(500, 1000) / 1000)
+            time.sleep(sleeping_time)
+            print(f"Sleeping {sleeping_time} seconds.")
             url = row['url']
             print(f"Scraping job information from title: {row['title']}")
-            cleaned_description = scrape_job_info(driver, url)
+            html_content, description = scrape_job_info(
+                driver, url)
 
-            if cleaned_description:  # Check if scraping was successful
-                print(f"description: {cleaned_description}")
-                df.loc[index, 'description'] = cleaned_description
+            if description:  # Check if scraping was successful
+                print(f"description: {description}")
+                df.loc[index, 'description'] = description
+                df.loc[index, 'html_content'] = html_content
             else:
                 print(f"Failed to scrape job information for URL: {url}")
 
             # Save intermediate results to CSV
-            df.to_csv(f'results/{filename}_descriptions.csv', index=False)
+            df.to_csv(f"results/{get_filename('descriptions')}", index=False)
 
     except Exception as e:
         print(
             f"An error occured in the extract process: {e}")
     finally:
-        os.remove(f"results/{filename}_links.csv")
+        os.remove(f"results/{get_filename('links')}")
         driver.quit()
-
-
-def extract_scraping_browser():
-    with setup_scrape_browser() as driver:
-        scrape_search_results(
-            driver, STARTING_URL)
 
 
 if __name__ == "__main__":
     extract()
-    # extract_scraping_browser()

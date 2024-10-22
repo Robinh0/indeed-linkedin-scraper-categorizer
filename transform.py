@@ -6,33 +6,31 @@ import threading
 from dotenv import load_dotenv
 from openai import OpenAI
 from constants import STARTING_URL
-from generics import create_results_filename
+from generics import get_filename, remove_stopwords
 
 # Load environment variables
 load_dotenv()
 
 # Constants
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-filename = create_results_filename(STARTING_URL)
 
 # Initialize API client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 COLUMNS = [
+    "location",
+    "programming_languages",
     "backend_frameworks",
-    "company_industry",
-    "company_name",
-    "company_size",
-    "company_type",
     "frontend_frameworks",
+    "seniority_level",
+    "company_type",
+    "years_of_experience",
+    "company_industry",
+    "company_size",
     "has_django",
     "has_python",
-    "is_data_engineer",
     "is_fullstack",
     "is_sustainability_focused",
-    "location",
-    "seniority_level",
-    "years_of_experience",
 ]
 
 FUNCTION_CONTEXT = [{
@@ -58,11 +56,15 @@ FUNCTION_CONTEXT = [{
             },
             "frontend_frameworks": {
                 "type": "string",
-                "description": "What frontend frameworks are mentioned, if any? Return exactly the frontend_frameworks json key",
+                "description": "What frontend frameworks are mentioned? Return all that are mentioned. Return exactly the frontend_frameworks json key",
             },
             "backend_frameworks": {
                 "type": "string",
-                "description": "What backend frameworks are mentioned, if any? Return exactly the backend_frameworks json key",
+                "description": "What backend frameworks are mentioned? Return all that are mentioned. Return exactly the backend_frameworks json key",
+            },
+            "programming_languages": {
+                "type": "string",
+                "description": "What programming languages are mentioned? Return all that are mentioned. Return exactly the programming_languages json key",
             },
             "company_type": {
                 "type": "string",
@@ -78,11 +80,6 @@ FUNCTION_CONTEXT = [{
                 "type": "string",
                 "description": "How many years of experience is required for this job role as a number? Return exactly the years_of_experience json key",
             },
-            "is_data_engineer": {
-                "type": "integer",
-                "description": "Is this role a data engineering role? Return exactly the is_data_engineer json key",
-                "enum": ['True', 'False']
-            },
             "is_sustainability_focused": {
                 "type": "string",
                 "description": "Is job post specifically oriented towards sustainability and making an impact on the planet and reducing footprint? Return exactly the is_sustainability_focused json key",
@@ -95,10 +92,6 @@ FUNCTION_CONTEXT = [{
             "location": {
                 "type": "string",
                 "description": "What is the location of the company in the job post? Return exactly the location json key",
-            },
-            "company_name": {
-                "type": "string",
-                "description": "What is the name of the company, if mentioned in the job post? Return exactly the company_name json key",
             },
             "company_size": {
                 "type": "integer",
@@ -153,7 +146,7 @@ def process_row(index: int, row: pd.Series, df: pd.DataFrame) -> None:
     Returns:
         None
     """
-    text = row['description']
+    text = remove_stopwords(row['description'])
     res = categorize_text(text=text, function_context=FUNCTION_CONTEXT)
 
     if res.get('has_python') is None:
@@ -174,7 +167,7 @@ def transform() -> None:
         None
     """
     df = pd.read_csv(
-        f"results/{filename}_descriptions.csv", on_bad_lines='skip')
+        f"results/{get_filename('descriptions')}", on_bad_lines='skip')
     # Initialize columns in DataFrame
     for col in COLUMNS:
         df[col] = None
@@ -195,7 +188,7 @@ def transform() -> None:
                 thread.join()
             threads = []
             df.fillna('unknown', inplace=True)
-            df.to_csv(f'{filename}_results.csv', index=False)
+            df.to_csv(get_filename('results'), index=False)
 
     # Join any remaining threads
     for thread in threads:
@@ -203,18 +196,20 @@ def transform() -> None:
 
     # Move the 'description' column to the back
     # Get all columns except 'description'
-    cols = [col for col in df.columns if col not in ['url', 'description']]
+    cols = [col for col in df.columns if col not in [
+        'url', 'description', 'html_content']]
     cols.append('url')
     cols.append('description')
+    cols.append('html_content')
 
     df = df[cols]  # Reorder the DataFrame
 
     # Final output
     df.fillna('unknown', inplace=True)
-    df.to_csv(f'results/{filename}_results.csv', index=False)
+    df.to_csv(f"results/{get_filename('results')}", index=False)
     print(df)
 
-    os.remove(f"results/{filename}_descriptions.csv")
+    # os.remove(f"results/{filename}_descriptions.csv")
 
 
 if __name__ == "__main__":
