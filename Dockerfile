@@ -4,13 +4,6 @@ FROM python:3.10
 # Set the working directory in the container to /app
 WORKDIR /app
 
-# Install system dependencies (xvfb, Chrome, etc.)
-RUN apt-get update && apt-get install -y wget unzip xvfb xserver-xephyr tigervnc-standalone-server x11-utils gnumeric && \
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
-apt-get install -y ./google-chrome-stable_current_amd64.deb && \
-rm google-chrome-stable_current_amd64.deb && \
-apt-get clean
-
 # Copy only requirements.txt first to leverage Docker caching for dependencies
 COPY requirements.txt /app/
 
@@ -21,4 +14,4 @@ RUN pip install --trusted-host pypi.python.org -r requirements.txt
 COPY . /app
 
 # Command to run your Python application
-CMD ["python", "run_etl.py"]
+CMD ["python", "extract.py"]

@@ -1,7 +1,7 @@
 import os
 from bs4 import BeautifulSoup
 from constants import STARTING_URL
-from generics import setup_driver, get_filename, setup_scrape_browser
+from generics import setup_driver, get_filename, setup_scrape_browser, sleep_random
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -9,7 +9,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from undetected_chromedriver import Chrome
 import pandas as pd
 import time
-from random import randint
+import boto3
+from datetime import datetime
 
 
 def scrape_search_results(driver: Chrome, url_to_scrape):
@@ -59,16 +60,23 @@ def scrape_search_results(driver: Chrome, url_to_scrape):
 
         # Iterate through each element to extract job titles and links
         for element in elements:
-            title = element.find_element(
-                By.XPATH, ".//h2/a/span").text
+            driver.execute_script("arguments[0].scrollIntoView();", element)
+            title_link = element.find_element(By.XPATH, ".//h2/a")
+            title_link.click()
+            sleep_random(200)
+            title = element.find_element(By.XPATH, ".//h2/a/span").text
             company_name = element.find_element(
                 By.XPATH, ".//span[@data-testid='company-name']").text
             location = element.find_element(
                 By.XPATH, ".//div[@data-testid='text-location']").text
             link = element.find_element(
                 By.XPATH, './/h2/a').get_attribute("href")
-            salary = "-"
+            description = wait.until(EC.presence_of_element_located(
+                (By.XPATH, ".//div[@id='jobDescriptionText']")))
+            description_text = description.text
+            description_html_content = description.get_attribute('innerHTML')
 
+            salary = "-"
             try:
                 salary_element = element.find_element(
                     By.XPATH, ".//div[contains(@class, 'salary-snippet-container')]")
@@ -82,6 +90,8 @@ def scrape_search_results(driver: Chrome, url_to_scrape):
                 company_name: {company_name}\n
                 location: {location}\n
                 salary: {salary}\n\n
+                description: {description_text}\n\n
+                description_html_content: {description_html_content}\n\n
                 """)
 
             data.append(
@@ -90,7 +100,9 @@ def scrape_search_results(driver: Chrome, url_to_scrape):
                     "url": link,
                     "company_name": company_name,
                     "location": location,
-                    "salary": salary
+                    "salary": salary,
+                    "description": description_text,
+                    "html_content": description_html_content,
                 }
             )
         try:
@@ -110,88 +122,27 @@ def scrape_search_results(driver: Chrome, url_to_scrape):
         continue_loop = False
 
     df = pd.DataFrame(data)
-    df.to_csv(f"results/{get_filename('links')}", index=False)
+    df.to_csv(f"results/{get_filename('descriptions')}", index=False)
     return df
 
 
-def scrape_job_info(driver, url):
-    """
-    Scrapes job title and description from the given job listing URL.
-
-    Args:
-        driver: The Selenium WebDriver instance.
-        url (str): The URL of the job listing.
-
-    Returns:
-        tuple: A tuple containing the job title (str) and the cleaned job description (str).
-    """
-    success = False
-    while not success:
-        try:
-            driver.get(url)
-            wait = WebDriverWait(driver, 10)  # 10 seconds timeout
-
-            # Wait for the job description elements
-            text_elements = wait.until(EC.presence_of_all_elements_located(
-                (By.CLASS_NAME, "jobsearch-JobComponent-description")))
-            success = True  # If no exception is raised, set success to True
-
-        except TimeoutException:
-            print(f"Title not found for URL: {url}. Retrying...")
-            driver.quit()  # Quit the current driver instance
-            time.sleep(2)
-            driver = setup_driver()  # Reinitialize the driver
-        except WebDriverException as e:
-            print(f"WebDriver error for URL: {url}: {e}")
-            return None, None  # Return None values if a WebDriver error occurs
-
-    # Extract and clean text
-    text_list = []
-    for element in text_elements:
-        html_content = element.get_attribute('innerHTML')
-        soup = BeautifulSoup(html_content, "html.parser")
-        cleaned_text = soup.get_text(separator=' ', strip=True)
-        text_list.append(cleaned_text)
-
-    description = ' '.join(text_list)
-
-    return html_content, description
-
-
 def extract():
+    s3_client = boto3.client('s3')
     """Main function to orchestrate the ETL extract phase."""
-    # Step 1: Scrape job links
     try:
-        driver = setup_driver()
-        # driver = setup_scrape_browser()
-        df = scrape_search_results(driver, STARTING_URL)
-        # Step 2: Scrape job information from links
-        df['description'] = None
+        # driver = setup_driver()
+        driver = setup_scrape_browser()
+        scrape_search_results(driver, STARTING_URL)
 
-        for index, row in df.iterrows():
-            sleeping_time = (randint(500, 1000) / 1000)
-            time.sleep(sleeping_time)
-            print(f"Sleeping {sleeping_time} seconds.")
-            url = row['url']
-            print(f"Scraping job information from title: {row['title']}")
-            html_content, description = scrape_job_info(
-                driver, url)
-
-            if description:  # Check if scraping was successful
-                print(f"description: {description}")
-                df.loc[index, 'description'] = description
-                df.loc[index, 'html_content'] = html_content
-            else:
-                print(f"Failed to scrape job information for URL: {url}")
-
-            # Save intermediate results to CSV
-            df.to_csv(f"results/{get_filename('descriptions')}", index=False)
-
+        local_file = f"results/{get_filename('descriptions')}"
+        bucket_name = 'indeed-scraper-2'
+        s3_file_name = f"test"
+        s3_client.upload_file(local_file, bucket_name, s3_file_name)
     except Exception as e:
         print(
             f"An error occured in the extract process: {e}")
     finally:
-        os.remove(f"results/{get_filename('links')}")
+        # os.remove(f"results/{get_filename('links')}")
         driver.quit()
 
 

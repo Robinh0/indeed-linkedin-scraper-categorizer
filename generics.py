@@ -8,12 +8,17 @@ from langdetect import detect
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import nltk
-from constants import STARTING_URL
+from constants import STARTING_URL, BUCKET_NAME
+import time
+from random import randint
+import boto3
+from datetime import datetime
 
 
 # Download NLTK resources
 nltk.download('punkt')
 nltk.download('stopwords')
+nltk.download('punkt_tab')
 
 
 def setup_scrape_browser():
@@ -70,7 +75,6 @@ def get_filename(ending: str, url: str = STARTING_URL):
     >>> create_results_filename("https://example.com?q=python+developer&l=San+Francisco", 'links')
     'python_developer_san_francisco_links'
     """
-    print(url)
     title = url.split('q=')[1].split('&')[0].replace('+', '_').lower()
     area = url.split('l=')[1].split('&')[0].replace('+', '_').lower()
     return f'{title}_{area}_{ending}.csv'
@@ -101,3 +105,24 @@ def remove_stopwords(text):
     words = word_tokenize(text)
     filtered_text = [word for word in words if word.lower() not in stop_words]
     return ' '.join(filtered_text)
+
+
+def sleep_random(max_sleep_in_ms: int):
+    time_to_sleep = randint(100, max_sleep_in_ms) / 1000
+    time.sleep(time_to_sleep)
+    return
+
+
+def upload_file_to_s3():
+    s3_client = boto3.client('s3')
+
+    local_file = f"results/{get_filename('results')}"
+    filename_without_extension = local_file.split('/')[-1].split('.')[0]
+    current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{filename_without_extension}_{current_time_str}.csv"
+    print(filename)
+
+    s3_client.upload_file(local_file, BUCKET_NAME, filename)
+    link = f'http://{BUCKET_NAME}.s3.amazonaws.com/{filename}'
+    print(link)
+    print(f"The file is uploaded to s3, and can be downloaded here: {link}")

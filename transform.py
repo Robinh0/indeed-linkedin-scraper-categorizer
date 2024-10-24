@@ -6,7 +6,7 @@ import threading
 from dotenv import load_dotenv
 from openai import OpenAI
 from constants import STARTING_URL
-from generics import get_filename, remove_stopwords
+from generics import get_filename, remove_stopwords, upload_file_to_s3
 
 # Load environment variables
 load_dotenv()
@@ -188,7 +188,7 @@ def transform() -> None:
                 thread.join()
             threads = []
             df.fillna('unknown', inplace=True)
-            df.to_csv(get_filename('results'), index=False)
+            df.to_csv(f"results/{get_filename('results')}", index=False)
 
     # Join any remaining threads
     for thread in threads:
@@ -208,7 +208,7 @@ def transform() -> None:
     df.fillna('unknown', inplace=True)
     df.to_csv(f"results/{get_filename('results')}", index=False)
     print(df)
-
+    upload_file_to_s3()
     # os.remove(f"results/{filename}_descriptions.csv")
 
 
