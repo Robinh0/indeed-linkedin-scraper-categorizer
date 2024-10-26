@@ -2,9 +2,9 @@ from generics import setup_scrape_browser, sleep_random
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-# from undetected_chromedriver import Chrome
 import pandas as pd
 import os
+from generics import setup_driver
 
 
 def scrape_search_results(driver, url_to_scrape):
