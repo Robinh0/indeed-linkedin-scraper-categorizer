@@ -1,19 +1,13 @@
-import os
-from bs4 import BeautifulSoup
-from constants import STARTING_URL
-from generics import setup_driver, get_filename, setup_scrape_browser, sleep_random
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from generics import setup_scrape_browser, sleep_random
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from undetected_chromedriver import Chrome
+# from undetected_chromedriver import Chrome
 import pandas as pd
-import time
-import boto3
-from datetime import datetime
+import os
 
 
-def scrape_search_results(driver: Chrome, url_to_scrape):
+def scrape_search_results(driver, url_to_scrape):
     """
     Scrapes job titles and links from the provided Indeed search results URL.
 
@@ -30,6 +24,8 @@ def scrape_search_results(driver: Chrome, url_to_scrape):
     cookie_button_clicked = False
     popup_button_clicked = False
     data = []
+    counter = 0
+    max_pages_to_scrape = int(os.getenv("MAX_PAGES_TO_SCRAPE"))
     while continue_loop:
         wait = WebDriverWait(driver, 5)  # 10 seconds timeout
         elements = wait.until(EC.presence_of_all_elements_located(
@@ -105,46 +101,41 @@ def scrape_search_results(driver: Chrome, url_to_scrape):
                     "html_content": description_html_content,
                 }
             )
-        try:
-            # Only scraping the first page for this demo.
-            pass
-            # driver.execute_script(
-            #     "window.scrollTo(0, document.body.scrollHeight)")
-            # next_button = wait.until(EC.presence_of_element_located(
-            #     (By.XPATH, "//nav//li/a[@aria-label='Next Page']")))
-            # print("Next page button found! Clicking it.")
-            # next_button.click()
-        except:
-            print(
-                "Next button not found. Setting continue_loop to False and ending the scrape.")
+            break
+        if counter < max_pages_to_scrape-1:
+            print("Clicking the next button and scraping another page.")
+            try:
+                driver.execute_script(
+                    "window.scrollTo(0, document.body.scrollHeight)")
+                next_button = wait.until(EC.presence_of_element_located(
+                    (By.XPATH, "//nav//li/a[@aria-label='Next Page']")))
+                print("Next page button found! Clicking it.")
+                next_button.click()
+                counter += 1
+            except:
+                print(
+                    "Next button not found. Setting continue_loop to False and ending the scrape.")
+                continue_loop = False
+        else:
+            print("All pages scaped. continue_loop is set to false.")
             continue_loop = False
-            pass
-        continue_loop = False
 
     df = pd.DataFrame(data)
-    df.to_csv(f"results/{get_filename('descriptions')}", index=False)
+    # df.to_csv(f"results/{get_filename('descriptions')}", index=False)
     return df
 
 
 def extract():
-    s3_client = boto3.client('s3')
     """Main function to orchestrate the ETL extract phase."""
     try:
+        url = os.getenv('INDEED_URL')
         # driver = setup_driver()
         driver = setup_scrape_browser()
-        scrape_search_results(driver, STARTING_URL)
-
-        local_file = f"results/{get_filename('descriptions')}"
-        bucket_name = 'indeed-scraper-2'
-        s3_file_name = f"test"
-        s3_client.upload_file(local_file, bucket_name, s3_file_name)
+        df = scrape_search_results(driver, url)
     except Exception as e:
         print(
             f"An error occured in the extract process: {e}")
     finally:
         # os.remove(f"results/{get_filename('links')}")
         driver.quit()
-
-
-if __name__ == "__main__":
-    extract()
+        return df

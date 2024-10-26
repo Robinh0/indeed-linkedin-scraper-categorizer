@@ -3,13 +3,7 @@ import os
 import json
 import time
 import threading
-from dotenv import load_dotenv
 from openai import OpenAI
-from constants import STARTING_URL
-from generics import get_filename, remove_stopwords, upload_file_to_s3
-
-# Load environment variables
-load_dotenv()
 
 # Constants
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -146,8 +140,10 @@ def process_row(index: int, row: pd.Series, df: pd.DataFrame) -> None:
     Returns:
         None
     """
-    text = remove_stopwords(row['description'])
-    res = categorize_text(text=text, function_context=FUNCTION_CONTEXT)
+    # text = remove_stopwords(row['description'])
+    # res = categorize_text(text=text, function_context=FUNCTION_CONTEXT)
+    res = categorize_text(text=row['description'],
+                          function_context=FUNCTION_CONTEXT)
 
     if res.get('has_python') is None:
         df.at[index, 'enriched_with_chatgpt'] = "empty_response_from_openai_api"
@@ -159,15 +155,15 @@ def process_row(index: int, row: pd.Series, df: pd.DataFrame) -> None:
         df.at[index, column] = res.get(column, None)
 
 
-def transform() -> None:
+def transform(df: pd.DataFrame) -> None:
     """
     Main function to load data, process it, and output results.
 
     Returns:
         None
     """
-    df = pd.read_csv(
-        f"results/{get_filename('descriptions')}", on_bad_lines='skip')
+    # df = pd.read_csv(
+    #     f"results/{get_filename('descriptions')}", on_bad_lines='skip')
     # Initialize columns in DataFrame
     for col in COLUMNS:
         df[col] = None
@@ -188,7 +184,7 @@ def transform() -> None:
                 thread.join()
             threads = []
             df.fillna('unknown', inplace=True)
-            df.to_csv(f"results/{get_filename('results')}", index=False)
+            # df.to_csv(f"results/{get_filename('results')}", index=False)
 
     # Join any remaining threads
     for thread in threads:
@@ -206,11 +202,7 @@ def transform() -> None:
 
     # Final output
     df.fillna('unknown', inplace=True)
-    df.to_csv(f"results/{get_filename('results')}", index=False)
+    # df.to_csv(f"results/{get_filename('results')}", index=False)
     print(df)
-    upload_file_to_s3()
     # os.remove(f"results/{filename}_descriptions.csv")
-
-
-if __name__ == "__main__":
-    transform()
+    return df

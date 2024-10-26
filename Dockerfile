@@ -1,17 +1,17 @@
-# Use the official Python 3.10 image as the base
-FROM python:3.10
+# Use the official AWS Lambda Python 3.12 image
+FROM public.ecr.aws/lambda/python:3.11
 
-# Set the working directory in the container to /app
-WORKDIR /app
+# Set the working directory to Lambda's task root
+WORKDIR ${LAMBDA_TASK_ROOT}
 
-# Copy only requirements.txt first to leverage Docker caching for dependencies
-COPY requirements.txt /app/
+# Copy dependencies first for caching
+COPY requirements.txt ./
 
-# Install Python dependencies early to cache them if they don't change
+# Install dependencies
 RUN pip install --trusted-host pypi.python.org -r requirements.txt
 
-# Now copy the rest of your application code, this ensures code changes won't trigger a full rebuild
-COPY . /app
+# Copy the rest of the application code to ${LAMBDA_TASK_ROOT}
+COPY . .
 
-# Command to run your Python application
-CMD ["python", "extract.py"]
+# Set the Lambda-compatible handler
+CMD ["main.handler"]
