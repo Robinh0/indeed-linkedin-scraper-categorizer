@@ -179,7 +179,7 @@ def transform(df: pd.DataFrame) -> None:
         time.sleep(0.3)  # Adding a delay between starting each thread
 
         # Join threads in batches of 10
-        if index % 10 == 0 and index != 0:
+        if index % 50 == 0 and index != 0:
             for thread in threads:
                 thread.join()
             threads = []

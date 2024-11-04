@@ -8,13 +8,26 @@ from selenium.webdriver.chromium.remote_connection import ChromiumRemoteConnecti
 from webdriver_manager.chrome import ChromeDriverManager
 import os
 import time
-import undetected_chromedriver as uc
-
+import platform
 
 # Download NLTK resources
 # nltk.download('punkt')
 # nltk.download('stopwords')
 # nltk.download('punkt_tab')
+
+if platform.system() == "Windows":
+    import undetected_chromedriver as uc
+
+    def setup_driver():
+        """Initializes the Chrome WebDriver instance."""
+        chrome_options = uc.ChromeOptions()
+        try:
+            driver = uc.Chrome(options=chrome_options,
+                               service=Service(ChromeDriverManager().install()))
+        except Exception as e:
+            print(f"Error setting up Chrome driver: {e}")
+            return None
+        return driver
 
 
 def setup_scrape_browser():
@@ -24,18 +37,6 @@ def setup_scrape_browser():
     chrome_options = ChromeOptions()
     chrome_options.add_argument('--blink-settings=imagesEnabled=false')
     return Remote(sbr_connection, options=chrome_options)
-
-
-def setup_driver():
-    """Initializes the Chrome WebDriver instance."""
-    chrome_options = uc.ChromeOptions()
-    try:
-        driver = uc.Chrome(options=chrome_options,
-                           service=Service(ChromeDriverManager().install()))
-    except Exception as e:
-        print(f"Error setting up Chrome driver: {e}")
-        return None
-    return driver
 
 
 def remove_stopwords(text):

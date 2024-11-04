@@ -1,10 +1,11 @@
+from datetime import datetime
+import json
+import platform
 from extract import extract
 from load import load
 from transform import transform
 import os
 from dotenv import load_dotenv
-import threading
-from datetime import datetime
 
 
 def run_etl(filename, aws_download_link):
@@ -27,31 +28,52 @@ def run_etl(filename, aws_download_link):
 
 def handler(event, context):
     load_dotenv()
-    try:
-        print(event)
-        max_pages_to_scrape = event.get('max_pages_to_scrape')
-        indeed_url = event.get('indeed_url')
+    print(f"Event: {event}")
+    print(f"Context: {context}")
+    if platform.system() != "Windows":
+        message = event['Records'][0]['Sns']['Message']
+        print(f'message: {message}')
+        json_data = json.loads(message)
+        print(f'json_data: {json_data}')
 
-        # Check if both parameters are provided
-        if max_pages_to_scrape is not None or indeed_url is not None:
-            # Override current environment variables
-            os.environ['MAX_PAGES_TO_SCRAPE'] = str(
-                max_pages_to_scrape)
-            os.environ['INDEED_URL'] = str(indeed_url)
+        max_pages_to_scrape = json_data.get('max_pages_to_scrape')
+        nr_items_per_page = json_data.get('nr_items_per_page')
+        indeed_url = json_data.get('indeed_url')
+        filename = json_data.get('filename')
+        aws_download_link = json_data.get('aws_download_link')
 
-            # Log the new environment variables
-            print("Updated environment variables:")
-            print(f"MAX_PAGES_TO_SCRAPE: {os.environ['MAX_PAGES_TO_SCRAPE']}")
-            print(f"INDEED_URL: {os.environ['INDEED_URL']}")
-    except:
-        print("No event message located.")
+        print(f'max_pages_to_scrape: {max_pages_to_scrape}')
+        print(f'indeed_url: {indeed_url}')
+        print(f'filename: {filename}')
+        print(f'aws_download_link: {aws_download_link}')
 
-    filename = f'indeed_scraped_enriched_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-    aws_download_link = f'http://indeed-scrapy.s3.amazonaws.com/{filename}'
+        os.environ['MAX_PAGES_TO_SCRAPE'] = str(
+            max_pages_to_scrape)
+        os.environ['NR_ITEMS_PER_PAGE'] = str(nr_items_per_page)
+        os.environ['INDEED_URL'] = str(indeed_url)
+        os.environ['FILENAME'] = str(filename)
+        os.environ['AWS_DOWNLOAD_LINK'] = str(aws_download_link)
 
-    # Start ETL in a new thread
-    etl_thread = threading.Thread(
-        target=run_etl, args=(filename, aws_download_link))
-    etl_thread.start()
+        print("Updated environment variables:")
+    if platform.system() == "Windows":
+        filename = f'indeed_scraped_enriched_local_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        os.environ['MAX_PAGES_TO_SCRAPE'] = "99"
+        os.environ['NR_ITEMS_PER_PAGE'] = "15"
+        os.environ['INDEED_URL'] = "https://nl.indeed.com/jobs?q=data+engineer&l=Randstad"
+        os.environ['FILENAME'] = filename
+        os.environ[
+            'AWS_DOWNLOAD_LINK'] = f'http://indeed-scrapy.s3.amazonaws.com/{filename}'
 
-    return {"statusCode": 200, "download_link": aws_download_link}
+    # # Print all environment variables
+    # for key, value in os.environ.items():
+    #     print(f"{key}={value}")
+
+    run_etl(filename=os.getenv('FILENAME'),
+            aws_download_link=os.getenv('AWS_DOWNLOAD_LINK'))
+
+    if platform.system() != "Windows":
+        return {"statusCode": 200, "download_link": aws_download_link}
+
+
+if platform.system() == "Windows":
+    handler(None, None)
