@@ -57,8 +57,8 @@ def handler(event, context):
         print("Updated environment variables:")
     if platform.system() == "Windows":
         filename = f'indeed_scraped_enriched_local_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-        os.environ['MAX_PAGES_TO_SCRAPE'] = "99"
-        os.environ['NR_ITEMS_PER_PAGE'] = "15"
+        os.environ['MAX_PAGES_TO_SCRAPE'] = "1"
+        os.environ['NR_ITEMS_PER_PAGE'] = "5"
         os.environ['INDEED_URL'] = "https://nl.indeed.com/jobs?q=data+engineer&l=Randstad"
         os.environ['FILENAME'] = filename
         os.environ[

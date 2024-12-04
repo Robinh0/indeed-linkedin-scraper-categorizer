@@ -96,6 +96,9 @@ FUNCTION_CONTEXT = [{
     "required": COLUMNS
 }]
 
+# Global dictionary to store results and a lock for thread safety
+results = {}
+
 
 def categorize_text(text: str, function_context: list) -> dict:
     """
@@ -128,43 +131,39 @@ def categorize_text(text: str, function_context: list) -> dict:
         return {}
 
 
-def process_row(index: int, row: pd.Series, df: pd.DataFrame) -> None:
+def process_row(index: int, row: pd.Series, results: dict) -> None:
     """
-    Processes a single row in the DataFrame and updates it with categorized information.
+    Processes a single row in the DataFrame and stores it in a shared dictionary.
 
     Args:
         index (int): The index of the row being processed.
         row (pd.Series): The row data to process.
-        df (pd.DataFrame): The DataFrame being updated with categorized information.
+        results (dict): Dictionary to store processed row data.
 
     Returns:
         None
     """
-    # text = remove_stopwords(row['description'])
-    # res = categorize_text(text=text, function_context=FUNCTION_CONTEXT)
     res = categorize_text(text=row['description'],
                           function_context=FUNCTION_CONTEXT)
 
     if res.get('has_python') is None:
-        df.at[index, 'enriched_with_chatgpt'] = "empty_response_from_openai_api"
+        results[index] = {
+            'enriched_with_chatgpt': "empty_response_from_openai_api"}
         return
 
     print(f"ChatGPT categorisation for index {index}:\n{res}")
 
-    for column in COLUMNS:
-        df.at[index, column] = res.get(column, None)
+    # Store processed data in the results dictionary
+    results[index] = {col: res.get(col, None) for col in COLUMNS}
 
 
-def transform(df: pd.DataFrame) -> None:
+def transform(df: pd.DataFrame) -> pd.DataFrame:
     """
     Main function to load data, process it, and output results.
 
     Returns:
-        None
+        pd.DataFrame: Processed DataFrame.
     """
-    # df = pd.read_csv(
-    #     f"results/{get_filename('descriptions')}", on_bad_lines='skip')
-    # Initialize columns in DataFrame
     for col in COLUMNS:
         df[col] = None
 
@@ -172,37 +171,37 @@ def transform(df: pd.DataFrame) -> None:
 
     for index, row in df.iterrows():
         print(f"Processing row {index}")
-        thread = threading.Thread(target=process_row, args=(index, row, df))
+        thread = threading.Thread(
+            target=process_row, args=(index, row, results))
         threads.append(thread)
         thread.start()
 
-        time.sleep(0.3)  # Adding a delay between starting each thread
+        time.sleep(0.3)
 
-        # Join threads in batches of 10
         if index % 50 == 0 and index != 0:
+            # Wait for threads to finish and clear the list
             for thread in threads:
                 thread.join()
             threads = []
-            df.fillna('unknown', inplace=True)
-            # df.to_csv(f"results/{get_filename('results')}", index=False)
 
-    # Join any remaining threads
+            # Update the DataFrame outside of threads
+            for idx, processed_row in results.items():
+                df.loc[idx] = {**df.loc[idx], **processed_row}
+
+            df.fillna('unknown', inplace=True)
+            results.clear()
+
     for thread in threads:
         thread.join()
 
-    # Move the 'description' column to the back
-    # Get all columns except 'description'
+    for idx, processed_row in results.items():
+        df.loc[idx] = {**df.loc[idx], **processed_row}
+
     cols = [col for col in df.columns if col not in [
         'url', 'description', 'html_content']]
-    cols.append('url')
-    cols.append('description')
-    cols.append('html_content')
+    cols.extend(['url', 'description', 'html_content'])
+    df = df[cols]
 
-    df = df[cols]  # Reorder the DataFrame
-
-    # Final output
     df.fillna('unknown', inplace=True)
-    # df.to_csv(f"results/{get_filename('results')}", index=False)
     print(df)
-    # os.remove(f"results/{filename}_descriptions.csv")
     return df
