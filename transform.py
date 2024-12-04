@@ -5,10 +5,7 @@ import time
 import threading
 from openai import OpenAI
 
-# Constants
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-
-# Initialize API client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 COLUMNS = [
@@ -123,7 +120,6 @@ def categorize_text(text: str, function_context: list) -> dict:
             functions=function_context,
             function_call={"name": "choose_from_options"}
         )
-        # Extracting and parsing the response
         response_content = response.choices[0].message.function_call.arguments
         return json.loads(response_content)
     except Exception as e:
@@ -155,6 +151,7 @@ def process_row(index: int, row: pd.Series, results: dict) -> None:
 
     # Store processed data in the results dictionary
     results[index] = {col: res.get(col, None) for col in COLUMNS}
+    return
 
 
 def transform(df: pd.DataFrame) -> pd.DataFrame:
@@ -179,12 +176,12 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
         time.sleep(0.3)
 
         if index % 50 == 0 and index != 0:
-            # Wait for threads to finish and clear the list
             for thread in threads:
                 thread.join()
             threads = []
 
-            # Update the DataFrame outside of threads
+            # Update the DataFrame outside of threads, unpack the row and the processed_row as
+            # dictionaries, and then update the rows from processed_rows dict.
             for idx, processed_row in results.items():
                 df.loc[idx] = {**df.loc[idx], **processed_row}
 
