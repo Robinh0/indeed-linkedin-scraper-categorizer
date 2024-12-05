@@ -65,7 +65,7 @@ def handler(event, context):
     if platform.system() == "Windows":
         filename = f'indeed_scraped_enriched_local_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
         os.environ['MAX_PAGES_TO_SCRAPE'] = "1"
-        os.environ['NR_ITEMS_PER_PAGE'] = "1"
+        os.environ['NR_ITEMS_PER_PAGE'] = "10"
         os.environ['INDEED_URL'] = "https://nl.indeed.com/jobs?q=python+developer&l=Randstad"
         os.environ['FILENAME'] = filename
         os.environ[
