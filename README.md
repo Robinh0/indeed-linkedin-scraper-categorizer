@@ -12,4 +12,5 @@ The output is a csv file with extracted and enhanced job position data.
 ![image](https://github.com/user-attachments/assets/bab1f00a-3e9e-4cf4-9f93-7438ace584dd)
 
 The scraper runs locally, but is also deployed on AWS and can be called via an API Gateway post request. It then activates the ECR image in AWS and runs it with Lambda.
+
 Still a work in progress, next steps are to create a subclass of the Extractor class, to add functionality for scraping linkedin jobs as well.
