@@ -1,29 +1,36 @@
 from datetime import datetime
 import json
 import platform
-from extract import extract
-from load import load
-from transform import transform
+from etl.extract import Extractor
+from etl.load import Loader
+from etl.transform import Transformer
 import os
 from dotenv import load_dotenv
 
 
-def run_etl(filename, aws_download_link):
-    # Step 1: Extract job links
-    print("Starting extraction of job links and job description.")
-    df = extract()
+class ETLRunner:
+    def __init__(self):
+        pass
 
-    # Step 2: Transform data
-    print("Starting transformation of job data...")
-    df = transform(df)
+    def run(self, filename, aws_download_link):
+        # Step 1: Extract job links
+        print("Starting extraction of job links and job description.")
+        extractor = Extractor()
+        df = extractor.run_scraper()
 
-    # Step 3: Loading the results to the AWS S3 bucket
-    print("Starting load process to AWS S3.")
-    load(df, filename)
+        # Step 2: Transform data
+        print("Starting transformation of job data...")
+        transformer = Transformer()
+        df = transformer.transform(df=df)
 
-    print(
-        f"ETL process completed successfully. The results can be downloaded at {aws_download_link}")
-    return
+        # Step 3: Loading the results to the AWS S3 bucket
+        print("Starting load process to AWS S3.")
+        loader = Loader()
+        loader.load(df, filename)
+
+        print(
+            f"ETL process completed successfully. The results can be downloaded at {aws_download_link}")
+        return
 
 
 def handler(event, context):
@@ -58,8 +65,8 @@ def handler(event, context):
     if platform.system() == "Windows":
         filename = f'indeed_scraped_enriched_local_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
         os.environ['MAX_PAGES_TO_SCRAPE'] = "1"
-        os.environ['NR_ITEMS_PER_PAGE'] = "5"
-        os.environ['INDEED_URL'] = "https://nl.indeed.com/jobs?q=data+engineer&l=Randstad"
+        os.environ['NR_ITEMS_PER_PAGE'] = "1"
+        os.environ['INDEED_URL'] = "https://nl.indeed.com/jobs?q=python+developer&l=Randstad"
         os.environ['FILENAME'] = filename
         os.environ[
             'AWS_DOWNLOAD_LINK'] = f'http://indeed-scrapy.s3.amazonaws.com/{filename}'
@@ -68,8 +75,9 @@ def handler(event, context):
     # for key, value in os.environ.items():
     #     print(f"{key}={value}")
 
-    run_etl(filename=os.getenv('FILENAME'),
-            aws_download_link=os.getenv('AWS_DOWNLOAD_LINK'))
+    etl_runner = ETLRunner()
+    etl_runner.run(filename=os.getenv('FILENAME'),
+                   aws_download_link=os.getenv('AWS_DOWNLOAD_LINK'))
 
     if platform.system() != "Windows":
         return {"statusCode": 200, "download_link": aws_download_link}

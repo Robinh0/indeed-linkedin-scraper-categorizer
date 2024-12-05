@@ -15,29 +15,6 @@ import platform
 # nltk.download('stopwords')
 # nltk.download('punkt_tab')
 
-if platform.system() == "Windows":
-    import undetected_chromedriver as uc
-
-    def setup_driver():
-        """Initializes the Chrome WebDriver instance."""
-        chrome_options = uc.ChromeOptions()
-        try:
-            driver = uc.Chrome(options=chrome_options,
-                               service=Service(ChromeDriverManager().install()))
-        except Exception as e:
-            print(f"Error setting up Chrome driver: {e}")
-            return None
-        return driver
-
-
-def setup_scrape_browser():
-    SBR_WEBDRIVER = os.getenv("SCRAPING_BROWSER_URI")
-    print('Connecting to Scraping Browser...')
-    sbr_connection = ChromiumRemoteConnection(SBR_WEBDRIVER, 'goog', 'chrome')
-    chrome_options = ChromeOptions()
-    chrome_options.add_argument('--blink-settings=imagesEnabled=false')
-    return Remote(sbr_connection, options=chrome_options)
-
 
 def remove_stopwords(text):
     """
