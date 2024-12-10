@@ -1,7 +1,7 @@
 from datetime import datetime
 import json
 import platform
-from etl.extract import Extractor
+from etl.extract import IndeedExtractor, LinkedInExtractor
 from etl.load import Loader
 from etl.transform import Transformer
 import os
@@ -15,7 +15,11 @@ class ETLRunner:
     def run(self, filename, aws_download_link):
         # Step 1: Extract job links
         print("Starting extraction of job links and job description.")
-        extractor = Extractor()
+        if 'indeed.com' in os.getenv('URL'):
+            extractor = IndeedExtractor()
+        if 'linkedin.com' in os.getenv('URL'):
+            extractor = LinkedInExtractor()
+
         df = extractor.run_scraper()
 
         # Step 2: Transform data
@@ -45,19 +49,19 @@ def handler(event, context):
 
         max_pages_to_scrape = json_data.get('max_pages_to_scrape')
         nr_items_per_page = json_data.get('nr_items_per_page')
-        indeed_url = json_data.get('indeed_url')
+        url = json_data.get('URL')
         filename = json_data.get('filename')
         aws_download_link = json_data.get('aws_download_link')
 
         print(f'max_pages_to_scrape: {max_pages_to_scrape}')
-        print(f'indeed_url: {indeed_url}')
+        print(f'URL: {url}')
         print(f'filename: {filename}')
         print(f'aws_download_link: {aws_download_link}')
 
         os.environ['MAX_PAGES_TO_SCRAPE'] = str(
             max_pages_to_scrape)
         os.environ['NR_ITEMS_PER_PAGE'] = str(nr_items_per_page)
-        os.environ['INDEED_URL'] = str(indeed_url)
+        os.environ['URL'] = str(url)
         os.environ['FILENAME'] = str(filename)
         os.environ['AWS_DOWNLOAD_LINK'] = str(aws_download_link)
 
@@ -66,7 +70,8 @@ def handler(event, context):
         filename = f'indeed_scraped_enriched_local_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
         os.environ['MAX_PAGES_TO_SCRAPE'] = "1"
         os.environ['NR_ITEMS_PER_PAGE'] = "10"
-        os.environ['INDEED_URL'] = "https://nl.indeed.com/jobs?q=python+developer&l=Randstad"
+        # os.environ['URL'] = "https://nl.indeed.com/jobs?q=python+developer&l=Randstad"
+        os.environ['URL'] = "https://www.linkedin.com/jobs/search/?currentJobId=4084206092&distance=25&f_E=2&f_T=9%2C25201%2C24&geoId=90010383&keywords=python&origin=JOBS_HOME_SEARCH_CARDS"
         os.environ['FILENAME'] = filename
         os.environ[
             'AWS_DOWNLOAD_LINK'] = f'http://indeed-scrapy.s3.amazonaws.com/{filename}'
