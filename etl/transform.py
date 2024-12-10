@@ -57,7 +57,7 @@ class Transformer():
 
             time.sleep(0.3)
 
-            if index % 50 == 0 and index != 0:
+            if index % 500 == 0 and index != 0:
                 for thread in threads:
                     thread.join()
                 threads = []

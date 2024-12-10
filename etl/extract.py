@@ -8,7 +8,8 @@ from generics.generics import sleep_random
 from .driver_manager import DriverManager
 from selenium.webdriver.chrome.webdriver import WebDriver
 from undetected_chromedriver import Chrome
-from linkedin.scrape_linkedin import get_linkedin_descriptions
+import requests
+from pprint import pprint
 
 
 class Extractor:
@@ -181,22 +182,75 @@ class IndeedExtractor(Extractor):
 
 
 class LinkedInExtractor(Extractor):
-    # def __init__(self):
-    #     super().__init__()
-    #     self.cookies = {
-    #         "JSESSIONID": os.getenv('JSESSIONID'),
-    #         "li_at": os.getenv('li_at')
-    #     }
+    def __init__(self):
+        super().__init__()
+        self.headers = {
+            'cookie': f'JSESSIONID={os.getenv("JSESSIONID")}; li_at={os.getenv("LI_AT")}',
+            'csrf-token': f'{os.getenv("JSESSIONID")}'
+        }
+
+    def linkedin_jobsdashboard_api_service(self, start_value):
+        url = f"https://www.linkedin.com/voyager/api/voyagerJobsDashJobCards?decorationId=com.linkedin.voyager.dash.deco.jobs.search.JobSearchCardsCollection-216&q=jobSearch&query=(currentJobId:4036488959,origin:JOBS_HOME_SEARCH_CARDS,keywords:python,locationUnion:(geoId:90010383),selectedFilters:(distance:List(25),experience:List(2),title:List(9,25201,24)),spellCorrectionEnabled:true)&count=100&start={start_value}"
+        return requests.request("GET", url, headers=self.headers)
+
+    def get_starts_parameter_list(self):
+        print("Collecting the linkedin starts parameter list")
+        starts_list = [0]
+        res = self.linkedin_jobsdashboard_api_service(0)
+        pprint(res)
+        count = res.json()['paging']['total']
+        value_to_add = 100
+
+        while count > 100:
+            starts_list.append(value_to_add)
+            count -= 100
+            value_to_add += 100
+        print(f"The linkedin starts parameter list is: {starts_list}")
+        return starts_list
+
+    def get_linkedin_ids(self):
+        print("Scraping the linkedin ids list")
+        job_ids = []
+        # URL to scrape python jobs in amsterdam specifically, can change later.
+        starts_list = self.get_starts_parameter_list()
+        print(starts_list)
+        for starts_parameter in starts_list:
+            res = self.linkedin_jobsdashboard_api_service(
+                start_value=starts_parameter)
+            for element in res.json()['elements']:
+                id = element['jobCardUnion']['jobPostingCard']['preDashNormalizedJobPostingUrn'].split(
+                    "fs_normalized_jobPosting:")[1]
+                job_ids.append(id)
+        return job_ids
 
     def run_scraper(self):
-        # Getting the url and adding cookies
-        # cookies = {
-        #     "JSESSIONID": os.getenv('JSESSIONID'),
-        #     "li_at": os.getenv('LI_AT')
-        # }
-        # self.driver_manager.driver.get(self.url)
-        # time.sleep(5)
-        # self.driver_manager.add_cookies(cookies)
-        # self.driver_manager.driver.get(self.url)
-        # self.driver_manager.driver.manage().add_cookie(self.cookies)
-        return get_linkedin_descriptions()
+        job_ids = self.get_linkedin_ids()
+        print(job_ids)
+        job_data = []
+        for enum, id in enumerate(job_ids):
+            try:
+                individual_url = f"https://www.linkedin.com/voyager/api/jobs/jobPostings/{id}"
+                response = requests.request(
+                    "GET", individual_url, headers=self.headers)
+                # print(response.text)
+                response_json = response.json()
+                response.raise_for_status()
+                description = response_json['description']['text']
+                title = response_json['title']
+                url = f"https://www.linkedin.com/jobs/search/?currentJobId={id}"
+                job_data.append({'description': description,
+                                'title': title, 'url': url})
+                print(description)
+            except:
+                continue
+            finally:
+                # if enum == 10:
+                #     break
+                pass
+        df = pd.DataFrame(job_data)
+        df["company_name"] = None
+        df["location"] = None
+        df["salary"] = None
+        df["html_content"] = None
+        df.to_csv('Descriptions.csv')
+        return df
