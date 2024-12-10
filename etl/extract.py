@@ -30,6 +30,10 @@ class Extractor:
 
 
 class IndeedExtractor(Extractor):
+    """
+    This class scrapes Indeed by visiting the url in the environment variables and collecting the data with Selenium.
+    """
+
     def _close_cookies(self):
         """Closes the cookie consent pop-up if present."""
         short_wait = WebDriverWait(self.driver_manager.driver, 2)
@@ -182,6 +186,12 @@ class IndeedExtractor(Extractor):
 
 
 class LinkedInExtractor(Extractor):
+    """
+    This class scrapes Linkedin by emulating the web requests through the LinkedIn API.
+    The URL below is currently copied from the Chrome Dev Tools. I might add logic later to construct the url from the linkedin search filter.
+    The JSESSIONID and li_at values need to be copied from cookies in chrome dev tools and added to .env.
+    """
+
     def __init__(self):
         super().__init__()
         self.headers = {
