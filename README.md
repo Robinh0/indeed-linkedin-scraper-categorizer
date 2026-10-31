@@ -1,3 +1,11 @@
+> [!NOTE]
+> **Repository status**
+>
+> Please note that the public repositories are quite old (2024), and not up to date on current coding standards.
+
+<br>
+<br>
+
 This is a personal project that I created when searching for jobs. To make my own life easier, and also to learn more about cloud and devops practices.
 
 How does it work?
